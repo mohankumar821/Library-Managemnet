@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Management System</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="import" href="script.js">
+</head>
+<body>
+    <div class="live-indicator" id="liveIndicator">
+        🔴 LIVE
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <h1>📚 Library Management System</h1>
+            </div>
+            <div class="user-panel">
+                <div class="admin-panel" id="adminPanel">
+                    <span>👑 Admin Mode Active</span>
+                    <button class="btn btn-danger" onclick="logoutAdmin()">Logout</button>
+                </div>
+                <button class="admin-login" id="adminLogin" onclick="loginAdmin()">
+                    Admin Login
+                </button>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalBooks">0</div>
+                Total Books
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="availableBooks">0</div>
+                Available
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="borrowedBooks">0</div>
+                Borrowed
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="usersOnline">0</div>
+                Users Online
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('dashboard')">Dashboard</button>
+            <button class="tab-btn" onclick="showTab('add-book')">Add Book</button>
+            <button class="tab-btn" onclick="showTab('manage')">Manage Books</button>
+        </div>
+
+        <div class="content">
+            <!-- Dashboard Tab -->
+            <div class="section active" id="dashboard">
+                <h2>📊 Quick Stats</h2>
+                <p>Live updates from all connected users. Admin can manage all entries in real-time.</p>
+            </div>
+
+            <!-- Add Book Tab -->
+            <div class="section" id="add-book">
+                <h2>➕ Add New Book</h2>
+                <form class="book-form" onsubmit="addBook(event)">
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" id="bookTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Author</label>
+                        <input type="text" id="bookAuthor" required>
+                    </div>
+                    <div class="form-group">
+                        <label>ISBN</label>
+                        <input type="text" id="bookISBN" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="bookCategory" required>
+                            <option value="">Select Category</option>
+                            <option value="Fiction">Fiction</option>
+                            <option value="Non-Fiction">Non-Fiction</option>
+                            <option value="Science">Science</option>
+                            <option value="History">History</option>
+                            <option value="Biography">Biography</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Book</button>
+                </form>
+            </div>
+
+            <!-- Manage Books Tab -->
+            <div class="section" id="manage">
+                <h2>📚 All Books</h2>
+                <div class="books-list" id="booksList">
+                    <!-- Books will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+     
+    <script>
+         
+        // Sample data
+        let books = [];
+        let usersOnline = 0;
+        let isAdmin = false;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSampleData();
+            startLiveUpdates();
+            updateStats();
+        });
+
+        // Admin functions
+        function loginAdmin() {
+            const password = prompt('Admin Password:');
+            if (password === '123456789') { 
+                isAdmin = true;
+                document.getElementById('adminLogin').style.display = 'none';
+                document.getElementById('adminPanel').classList.add('active');
+                alert('Admin access granted! You can now manage all books.');
+            } else {
+                alert('Invalid password!');
+            }
+        }
+
+        function logoutAdmin() {
+            isAdmin = false;
+            document.getElementById('adminLogin').style.display = 'block';
+            document.getElementById('adminPanel').classList.remove('active');
+        }
+
+        // Tab switching
+        function showTab(tabName) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Add book
+        function addBook(event) {
+            event.preventDefault();
+            
+            if (!isAdmin) {
+                alert('Admin access required to add books!');
+                return;
+            }
+
+            const book = {
+                id: Date.now(),
+                title: document.getElementById('bookTitle').value,
+                author: document.getElementById('bookAuthor').value,
+                isbn: document.getElementById('bookISBN').value,
+                category: document.getElementById('bookCategory').value,
+                status: 'available',
+                borrowedBy: null,
+                timestamp: new Date().toLocaleString()
+            };
+
+            books.push(book);
+            broadcastUpdate('bookAdded', book);
+            document.querySelector('#add-book form').reset();
+            renderBooks();
+            updateStats();
+        }
+
+        // Render books
+        function renderBooks() {
+            const booksList = document.getElementById('booksList');
+            booksList.innerHTML = '';
+
+            books.forEach(book => {
+                const bookEl = document.createElement('div');
+                bookEl.className = 'book-item';
+                bookEl.innerHTML = `
+                    <div class="book-info">
+                        <h4>${book.title}</h4>
+                        <p><strong>${book.author}</strong> | ${book.isbn} | ${book.category}</p>
+                        <p><small>Added: ${book.timestamp}</small></p>
+                    </div>
+                    <div>
+                        <span class="status ${book.status}">${book.status.toUpperCase()}</span>
+                        ${isAdmin ? `
+                            <div style="margin-top: 10px;">
+                                <button class="btn btn-primary" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;" 
+                                        onclick="toggleStatus(${book.id})">
+                                    ${book.status === 'available' ? 'Borrow' : 'Return'}
+                                </button>
+                                <button class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;" 
+                                        onclick="deleteBook(${book.id})">Delete</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                booksList.appendChild(bookEl);
+            });
+        }
+
+        // Admin actions
+        function toggleStatus(bookId) {
+            const book = books.find(b => b.id === bookId);
+            if (book) {
+                book.status = book.status === 'available' ? 'borrowed' : 'available';
+                book.timestamp = new Date().toLocaleString();
+                broadcastUpdate('statusChanged', book);
+                renderBooks();
+                updateStats();
+            }
+        }
+
+        function deleteBook(bookId) {
+            if (confirm('Are you sure you want to delete this book?')) {
+                books = books.filter(b => b.id !== bookId);
+                broadcastUpdate('bookDeleted', bookId);
+                renderBooks();
+                updateStats();
+            }
+        }
+
+        // Live updates simulation
+        function startLiveUpdates() {
+            usersOnline++;
+            updateStats();
+
+            // Simulate other users activity
+            setInterval(() => {
+                if (Math.random() > 0.7) {
+                    simulateUserActivity();
+                }
+            }, 3000);
+        }
+
+        function simulateUserActivity() {
+            const actions = ['bookAdded', 'statusChanged'];
+            const action = actions[Math.floor(Math.random() * actions.length)];
+            
+            if (action === 'bookAdded' && books.length < 20) {
+                const fakeBook = {
+                    id: Date.now() + Math.random(),
+                    title: `Sample Book ${books.length + 1}`,
+                    author: 'Sample Author',
+                    isbn: `ISBN-${Math.random().toString().slice(2, 8)}`,
+                    category: ['Fiction', 'Science'][Math.floor(Math.random() * 2)],
+                    status: Math.random() > 0.5 ? 'available' : 'borrowed',
+                    timestamp: new Date().toLocaleString()
+                };
+                books.push(fakeBook);
+                renderBooks();
+                updateStats();
+            } else if (action === 'statusChanged' && books.length > 0) {
+                const randomBook = books[Math.floor(Math.random() * books.length)];
+                randomBook.status = randomBook.status === 'available' ? 'borrowed' : 'available';
+                randomBook.timestamp = new Date().toLocaleString();
+                renderBooks();
+                updateStats();
+            }
+        }
+
+        function broadcastUpdate(type, data) {
+            // Simulate WebSocket broadcast
+            console.log('Broadcasting:', type, data);
+            document.getElementById('liveIndicator').textContent = `🔴 LIVE - ${type.toUpperCase()}`;
+            setTimeout(() => {
+                document.getElementById('liveIndicator').textContent = '🔴 LIVE';
+            }, 2000);
+        }
+
+        function updateStats() {
+            const available = books.filter(b => b.status === 'available').length;
+            const borrowed = books.length - available;
+            
+            document.getElementById('totalBooks').textContent = books.length;
+            document.getElementById('availableBooks').textContent = available;
+            document.getElementById('borrowedBooks').textContent = borrowed;
+            document.getElementById('usersOnline').textContent = usersOnline;
+        }
+
+        function loadSampleData() {
+            books = [
+                {
+                    id: 1,
+                    title: "The Great Gatsby",
+                    author: "F. Scott Fitzgerald",
+                    isbn: "978-0-7432-7356-5",
+                    category: "Fiction",
+                    status: "available",
+                    timestamp: "2024-01-15 10:30:00"
+                },
+                {
+                    id: 2,
+                    title: "Sapiens",
+                    author: "Yuval Noah Harari",
+                    isbn: "978-0-06-231609-7",
+                    category: "Non-Fiction",
+                    status: "borrowed",
+                    timestamp: "2024-01-16 14:22:00"
+                }
+            ];
+            renderBooks();
+            updateStats();
+        }
+    
+    </script>
+</body>
+</html>
